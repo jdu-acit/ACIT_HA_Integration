@@ -1,0 +1,83 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "ACIT Device Setup",
+        "description": "Add your ACIT device",
+        "data": {
+          "name": "Device name",
+          "host": "IP address",
+          "port": "Port"
+        },
+        "data_description": {
+          "name": "Custom name for your device",
+          "host": "IP address of the device (e.g., 10.0.0.41)",
+          "port": "HTTP port (default: 80)"
+        }
+      },
+      "manual": {
+        "title": "Manual Configuration",
+        "description": "Enter the IP address of your ACIT device",
+        "data": {
+          "name": "Device name",
+          "host": "IP address",
+          "port": "Port"
+        },
+        "data_description": {
+          "name": "Custom name for your device",
+          "host": "IP address of the device (e.g., 10.0.0.41)",
+          "port": "HTTP port (default: 80)"
+        }
+      },
+      "discovery_confirm": {
+        "title": "Discovered ACIT Device",
+        "description": "Do you want to add the discovered device **{name}** ({host})?\n\nModel: **{model}**"
+      }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect to device",
+      "unknown": "Unexpected error"
+    },
+    "abort": {
+      "already_configured": "Device is already configured"
+    }
+  },
+  "entity": {
+    "sensor": {
+      "temperature": {
+        "name": "Temperature"
+      },
+      "target_temperature": {
+        "name": "Target temperature"
+      },
+      "heater_level": {
+        "name": "Heater level"
+      },
+      "fan_speed": {
+        "name": "Fan speed"
+      },
+      "power": {
+        "name": "Power"
+      },
+      "energy_import": {
+        "name": "Energy import"
+      },
+      "energy_export": {
+        "name": "Energy export"
+      },
+      "battery_level": {
+        "name": "Battery level"
+      }
+    },
+    "climate": {
+      "thermacec": {
+        "name": "Thermostat"
+      }
+    },
+    "update": {
+      "firmware": {
+        "name": "Firmware"
+      }
+    }
+  }
+}

@@ -1,0 +1,83 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Configuration ACIT",
+        "description": "Ajoutez votre appareil ACIT",
+        "data": {
+          "name": "Nom de l'appareil",
+          "host": "Adresse IP",
+          "port": "Port"
+        },
+        "data_description": {
+          "name": "Nom personnalisé pour votre appareil",
+          "host": "Adresse IP de l'appareil (ex: 10.0.0.41)",
+          "port": "Port HTTP (défaut: 80)"
+        }
+      },
+      "manual": {
+        "title": "Configuration manuelle",
+        "description": "Entrez l'adresse IP de votre appareil ACIT",
+        "data": {
+          "name": "Nom de l'appareil",
+          "host": "Adresse IP",
+          "port": "Port"
+        },
+        "data_description": {
+          "name": "Nom personnalisé pour votre appareil",
+          "host": "Adresse IP de l'appareil (ex: 10.0.0.41)",
+          "port": "Port HTTP (défaut: 80)"
+        }
+      },
+      "discovery_confirm": {
+        "title": "Appareil ACIT découvert",
+        "description": "Voulez-vous ajouter l'appareil découvert **{name}** ({host}) ?\n\nModèle: **{model}**"
+      }
+    },
+    "error": {
+      "cannot_connect": "Impossible de se connecter à l'appareil",
+      "unknown": "Erreur inattendue"
+    },
+    "abort": {
+      "already_configured": "Cet appareil est déjà configuré"
+    }
+  },
+  "entity": {
+    "sensor": {
+      "temperature": {
+        "name": "Température"
+      },
+      "target_temperature": {
+        "name": "Température de consigne"
+      },
+      "heater_level": {
+        "name": "Niveau de chauffage"
+      },
+      "fan_speed": {
+        "name": "Vitesse du ventilateur"
+      },
+      "power": {
+        "name": "Puissance"
+      },
+      "energy_import": {
+        "name": "Énergie importée"
+      },
+      "energy_export": {
+        "name": "Énergie exportée"
+      },
+      "battery_level": {
+        "name": "Niveau de batterie"
+      }
+    },
+    "climate": {
+      "thermacec": {
+        "name": "Thermostat"
+      }
+    },
+    "update": {
+      "firmware": {
+        "name": "Firmware"
+      }
+    }
+  }
+}
