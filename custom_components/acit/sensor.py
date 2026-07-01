@@ -14,8 +14,8 @@ from homeassistant.components.sensor import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
-    EntityCategory,
     PERCENTAGE,
+    EntityCategory,
     UnitOfEnergy,
     UnitOfPower,
     UnitOfTemperature,
