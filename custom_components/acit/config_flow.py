@@ -10,7 +10,7 @@ import homeassistant.helpers.config_validation as cv
 import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.components import zeroconf
-from homeassistant.const import CONF_HOST, CONF_NAME, CONF_PORT
+from homeassistant.const import CONF_HOST, CONF_NAME, CONF_PORT, CONF_TOKEN
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResult
 
@@ -20,6 +20,8 @@ from .const import (
     DOMAIN,
     RPC_ENDPOINT,
     RPC_METHOD_GET_CONFIG,
+    RPC_METHOD_REQUEST_TOKEN,
+    RPC_TIMEOUT,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -33,7 +35,11 @@ STEP_USER_DATA_SCHEMA = vol.Schema(
 )
 
 
-async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str, Any]:
+class NotAuthorizedError(Exception):
+    """Raised when the device requires authorization (no valid token)."""
+
+
+async def validate_input(hass: HomeAssistant, data: dict[str, Any], token: str | None = None) -> dict[str, Any]:
     """Validate user input by testing the RPC connection."""
     host = data[CONF_HOST]
     port = data.get(CONF_PORT, DEFAULT_PORT)
@@ -45,14 +51,21 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
         "method": RPC_METHOD_GET_CONFIG,
         "params": {},
     }
+    headers = {}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
 
     try:
         async with aiohttp.ClientSession() as session:
             async with session.post(
                 url,
                 json=payload,
-                timeout=aiohttp.ClientTimeout(total=10),
+                headers=headers,
+                timeout=aiohttp.ClientTimeout(total=RPC_TIMEOUT),
             ) as response:
+                if response.status == 401:
+                    raise NotAuthorizedError()
+
                 if response.status != 200:
                     raise ValueError(f"HTTP error {response.status}")
 
@@ -77,6 +90,41 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
         raise ValueError(f"Connection error: {err}") from err
 
 
+async def request_token(host: str, port: int) -> str | None:
+    """Request a pairing token from the device.
+
+    The device must be in provisioning mode (activated via its menu).
+    Returns the token string on success, or None if not in provisioning mode.
+    """
+    url = f"http://{host}:{port}{RPC_ENDPOINT}"
+    payload = {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": RPC_METHOD_REQUEST_TOKEN,
+        "params": {},
+    }
+
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                url,
+                json=payload,
+                timeout=aiohttp.ClientTimeout(total=RPC_TIMEOUT),
+            ) as response:
+                if response.status != 200:
+                    return None
+
+                result = await response.json()
+
+                if "error" in result:
+                    return None
+
+                return result.get("result", {}).get("token")
+
+    except Exception:
+        return None
+
+
 class ACITThermaControlConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle the config flow for ACIT ThermaControl."""
 
@@ -85,6 +133,9 @@ class ACITThermaControlConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     def __init__(self) -> None:
         """Initialize the config flow."""
         self._discovered_devices: dict[str, dict[str, Any]] = {}
+        self._host: str = ""
+        self._port: int = DEFAULT_PORT
+        self._name: str = DEFAULT_NAME
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -99,8 +150,14 @@ class ACITThermaControlConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
 
         if user_input is not None:
+            self._host = user_input[CONF_HOST]
+            self._port = user_input.get(CONF_PORT, DEFAULT_PORT)
+            self._name = user_input[CONF_NAME]
+
             try:
                 info = await validate_input(self.hass, user_input)
+            except NotAuthorizedError:
+                return await self.async_step_authorize()
             except ValueError as err:
                 _LOGGER.error(f"Validation error: {err}")
                 errors["base"] = "cannot_connect"
@@ -108,14 +165,11 @@ class ACITThermaControlConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 _LOGGER.exception("Unexpected error during validation")
                 errors["base"] = "unknown"
             else:
-                # Use MAC address as unique_id
-                mac_address = info.get("mac_address", user_input[CONF_HOST])
+                mac_address = info.get("mac_address", self._host)
                 await self.async_set_unique_id(mac_address)
                 self._abort_if_unique_id_configured()
 
-                # Add device_name to data
-                user_input["device_name"] = user_input[CONF_NAME]
-
+                user_input["device_name"] = self._name
                 return self.async_create_entry(title=info["title"], data=user_input)
 
         return self.async_show_form(
@@ -128,6 +182,65 @@ class ACITThermaControlConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 "port": str(DEFAULT_PORT),
             },
         )
+
+    async def async_step_authorize(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Provisioning step: user activates pairing mode on the device, then confirms."""
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            token = await request_token(self._host, self._port)
+
+            if token is None:
+                errors["base"] = "authorization_failed"
+            else:
+                data = {
+                    CONF_HOST: self._host,
+                    CONF_PORT: self._port,
+                    CONF_NAME: self._name,
+                    CONF_TOKEN: token,
+                    "device_name": self._name,
+                }
+                try:
+                    info = await validate_input(self.hass, data, token=token)
+                except Exception:
+                    errors["base"] = "cannot_connect"
+                else:
+                    mac_address = info.get("mac_address", self._host)
+                    await self.async_set_unique_id(mac_address)
+                    self._abort_if_unique_id_configured()
+                    return self.async_create_entry(title=info["title"], data=data)
+
+        return self.async_show_form(step_id="authorize", errors=errors)
+
+    async def async_step_reauth(
+        self, entry_data: dict[str, Any]
+    ) -> FlowResult:
+        """Handle re-auth when the stored token is rejected by the device."""
+        self._host = entry_data[CONF_HOST]
+        self._port = entry_data.get(CONF_PORT, DEFAULT_PORT)
+        self._name = entry_data.get(CONF_NAME, DEFAULT_NAME)
+        return await self.async_step_reauth_confirm()
+
+    async def async_step_reauth_confirm(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Confirm re-pairing by requesting a new token from the device."""
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            token = await request_token(self._host, self._port)
+
+            if token is None:
+                errors["base"] = "authorization_failed"
+            else:
+                return self.async_update_reload_and_abort(
+                    self._get_reauth_entry(),
+                    data_updates={CONF_TOKEN: token},
+                )
+
+        return self.async_show_form(step_id="reauth_confirm", errors=errors)
 
     async def async_step_zeroconf(
         self, discovery_info: zeroconf.ZeroconfServiceInfo
@@ -142,57 +255,31 @@ class ACITThermaControlConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         # Extract device name from hostname
         device_name = hostname.replace(".local.", "").replace("_", " ").title()
 
-        # Test connection and retrieve config
-        try:
-            info = await validate_input(
-                self.hass,
-                {
-                    CONF_NAME: device_name,
-                    CONF_HOST: host,
-                    CONF_PORT: port,
-                },
-            )
-        except Exception as err:
-            _LOGGER.error(f"Error validating discovered device: {err}")
-            return self.async_abort(reason="cannot_connect")
+        self._host = host
+        self._port = port
+        self._name = device_name
 
-        # Use MAC address as unique_id
-        mac_address = info.get("mac_address", host)
-        await self.async_set_unique_id(mac_address)
+        # Use host as a temporary unique_id until we can read the MAC after pairing
+        await self.async_set_unique_id(host)
         self._abort_if_unique_id_configured()
 
-        # Store discovered device information
         self.context["title_placeholders"] = {"name": device_name}
-        self._discovered_devices[mac_address] = {
-            CONF_NAME: device_name,
-            CONF_HOST: host,
-            CONF_PORT: port,
-            "device_name": device_name,
-            "mac_address": mac_address,
-            "model": info.get("model", "ThermACEC"),
-        }
 
         return await self.async_step_discovery_confirm()
 
     async def async_step_discovery_confirm(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Confirm discovery."""
-        mac_address = self.unique_id
-        discovered = self._discovered_devices.get(mac_address, {})
-
+        """Confirm discovery, then proceed to pairing."""
         if user_input is not None:
-            return self.async_create_entry(
-                title=discovered[CONF_NAME],
-                data=discovered,
-            )
+            return await self.async_step_authorize()
 
         return self.async_show_form(
             step_id="discovery_confirm",
             description_placeholders={
-                "name": discovered.get(CONF_NAME, "ACIT ThermACEC"),
-                "host": discovered.get(CONF_HOST, ""),
-                "model": discovered.get("model", "ThermACEC"),
+                "name": self._name,
+                "host": self._host,
+                "model": "ThermACEC",
             },
         )
 

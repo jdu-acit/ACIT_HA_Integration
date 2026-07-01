@@ -28,6 +28,7 @@ RPC_METHOD_GET_CONFIG: Final = "Thermostat.GetConfig"
 RPC_METHOD_SET_TARGET_TEMP: Final = "Thermostat.SetTargetTemp"
 RPC_METHOD_SET_MODE: Final = "Thermostat.SetMode"
 RPC_METHOD_SYSTEM_REBOOT: Final = "System.Reboot"
+RPC_METHOD_REQUEST_TOKEN: Final = "System.RequestToken"
 
 # JSON-RPC Methods - OTA
 RPC_METHOD_CHECK_UPDATE: Final = "System.CheckUpdate"

@@ -14,6 +14,7 @@ from homeassistant.components.sensor import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
+    EntityCategory,
     PERCENTAGE,
     UnitOfEnergy,
     UnitOfPower,
@@ -68,6 +69,7 @@ SENSORS: tuple[ACITSensorEntityDescription, ...] = (
     ACITSensorEntityDescription(
         key="heater_level",
         translation_key="heater_level",
+        entity_category=EntityCategory.DIAGNOSTIC,
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=0,
         exists_fn=lambda data: data.get("heater_level") is not None,
@@ -77,11 +79,23 @@ SENSORS: tuple[ACITSensorEntityDescription, ...] = (
     ACITSensorEntityDescription(
         key="fan_speed",
         translation_key="fan_speed",
+        entity_category=EntityCategory.DIAGNOSTIC,
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=0,
         exists_fn=lambda data: data.get("fan_speed") is not None,
         value_fn=lambda data: data.get("fan_speed"),
         required_feature=ACITFeature.FAN,
+    ),
+    ACITSensorEntityDescription(
+        key="core_charge_pct",
+        translation_key="core_charge_pct",
+        native_unit_of_measurement=PERCENTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=1,
+        icon="mdi:thermometer-lines",
+        exists_fn=lambda data: data.get("core_charge_pct") is not None,
+        value_fn=lambda data: data.get("core_charge_pct"),
+        required_feature=ACITFeature.CORE_CHARGE,
     ),
     # Energy sensors (EMS)
     ACITSensorEntityDescription(

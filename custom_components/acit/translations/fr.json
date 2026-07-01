@@ -32,11 +32,20 @@
       "discovery_confirm": {
         "title": "Appareil ACIT découvert",
         "description": "Voulez-vous ajouter l'appareil découvert **{name}** ({host}) ?\n\nModèle: **{model}**"
+      },
+      "authorize": {
+        "title": "Coupler votre appareil ACIT",
+        "description": "Activez le mode couplage sur votre appareil (via son menu), puis cliquez sur **Valider**.\n\nVous avez **3 minutes** pour effectuer cette étape."
+      },
+      "reauth_confirm": {
+        "title": "Recoupler votre appareil ACIT",
+        "description": "L'appareil ne reconnaît plus cette instance. Activez le mode couplage sur votre appareil (via son menu), puis cliquez sur **Valider**.\n\nVous avez **3 minutes** pour effectuer cette étape."
       }
     },
     "error": {
       "cannot_connect": "Impossible de se connecter à l'appareil",
-      "unknown": "Erreur inattendue"
+      "unknown": "Erreur inattendue",
+      "authorization_failed": "Couplage échoué — assurez-vous que l'appareil est en mode couplage et réessayez"
     },
     "abort": {
       "already_configured": "Cet appareil est déjà configuré"
@@ -56,6 +65,9 @@
       "fan_speed": {
         "name": "Vitesse du ventilateur"
       },
+      "core_charge_pct": {
+        "name": "Charge du noyau"
+      },
       "power": {
         "name": "Puissance"
       },
@@ -67,6 +79,11 @@
       },
       "battery_level": {
         "name": "Niveau de batterie"
+      }
+    },
+    "number": {
+      "target_temperature_setpoint": {
+        "name": "Température de consigne"
       }
     },
     "climate": {

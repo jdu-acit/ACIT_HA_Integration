@@ -32,11 +32,20 @@
       "discovery_confirm": {
         "title": "Discovered ACIT Device",
         "description": "Do you want to add the discovered device **{name}** ({host})?\n\nModel: **{model}**"
+      },
+      "authorize": {
+        "title": "Pair your ACIT device",
+        "description": "Activate pairing mode on your device (via its menu), then click **Submit**.\n\nYou have **3 minutes** to complete this step."
+      },
+      "reauth_confirm": {
+        "title": "Re-pair your ACIT device",
+        "description": "The device no longer recognizes this instance. Activate pairing mode on your device (via its menu), then click **Submit**.\n\nYou have **3 minutes** to complete this step."
       }
     },
     "error": {
       "cannot_connect": "Failed to connect to device",
-      "unknown": "Unexpected error"
+      "unknown": "Unexpected error",
+      "authorization_failed": "Pairing failed — make sure the device is in pairing mode and try again"
     },
     "abort": {
       "already_configured": "Device is already configured"

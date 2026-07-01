@@ -14,7 +14,7 @@ from .coordinator import ACITThermACECCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.CLIMATE, Platform.UPDATE]
+PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.CLIMATE, Platform.UPDATE, Platform.NUMBER]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

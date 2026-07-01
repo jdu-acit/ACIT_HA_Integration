@@ -9,7 +9,7 @@ from typing import Any
 
 import aiohttp
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_HOST, CONF_PORT
+from homeassistant.const import CONF_HOST, CONF_PORT, CONF_TOKEN
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
@@ -43,6 +43,7 @@ class ACITThermACECCoordinator(DataUpdateCoordinator):
         self.entry = entry
         self._host = entry.data[CONF_HOST]
         self._port = entry.data.get(CONF_PORT, 80)
+        self._token: str | None = entry.data.get(CONF_TOKEN)
         self._rpc_id = 1
 
         # HTTP session
@@ -66,6 +67,7 @@ class ACITThermACECCoordinator(DataUpdateCoordinator):
             "target_temperature": None,
             "heater_level": None,
             "fan_speed": None,
+            "core_charge_pct": None,
             "available": False,
             "ota": {
                 "update_available": False,
@@ -115,14 +117,24 @@ class ACITThermACECCoordinator(DataUpdateCoordinator):
         }
         self._rpc_id += 1
 
+        headers = {}
+        if self._token:
+            headers["Authorization"] = f"Bearer {self._token}"
+
         _LOGGER.debug(f"RPC call: {method} - {params}")
 
         try:
             async with self._session.post(
                 url,
                 json=payload,
+                headers=headers,
                 timeout=aiohttp.ClientTimeout(total=RPC_TIMEOUT),
             ) as response:
+                if response.status == 401:
+                    _LOGGER.warning("Device rejected the token — re-pairing required")
+                    self.entry.async_start_reauth(self.hass)
+                    raise UpdateFailed("Authorization required — re-pair the device")
+
                 if response.status != 200:
                     raise UpdateFailed(f"HTTP error {response.status}")
 
@@ -201,8 +213,9 @@ class ACITThermACECCoordinator(DataUpdateCoordinator):
         if self._session is None:
             return
 
-        url = f"ws://{self._host}:{self._port}{WS_ENDPOINT}"
-        _LOGGER.info(f"Connecting WebSocket to {url}")
+        token_param = f"?token={self._token}" if self._token else ""
+        url = f"ws://{self._host}:{self._port}{WS_ENDPOINT}{token_param}"
+        _LOGGER.info(f"Connecting WebSocket to ws://{self._host}:{self._port}{WS_ENDPOINT}")
 
         try:
             async with self._session.ws_connect(url) as ws:
@@ -246,6 +259,7 @@ class ACITThermACECCoordinator(DataUpdateCoordinator):
                 self.data["target_temperature"] = params.get("target_temperature")
                 self.data["heater_level"] = params.get("heater_level")
                 self.data["fan_speed"] = params.get("fan_speed")
+                self.data["core_charge_pct"] = params.get("core_charge_pct")
                 self.data["available"] = True
 
                 # Notify entities
@@ -270,6 +284,7 @@ class ACITThermACECCoordinator(DataUpdateCoordinator):
             self.data["target_temperature"] = status.get("target_temperature")
             self.data["heater_level"] = status.get("heater_level")
             self.data["fan_speed"] = status.get("fan_speed")
+            self.data["core_charge_pct"] = status.get("core_charge_pct")
             self.data["available"] = True
 
             # Check OTA status

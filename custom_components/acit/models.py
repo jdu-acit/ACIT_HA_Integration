@@ -24,6 +24,7 @@ class ACITFeature(StrEnum):
     HEATING = "heating"
     COOLING = "cooling"
     FAN = "fan"
+    CORE_CHARGE = "core_charge"
 
     # Energy (EMS)
     POWER_MONITORING = "power_monitoring"
@@ -61,6 +62,7 @@ MODEL_CONFIGS: dict[str, ACITModelConfig] = {
             ACITFeature.TARGET_TEMPERATURE,
             ACITFeature.HEATING,
             ACITFeature.FAN,
+            ACITFeature.CORE_CHARGE,
         ],
         icon="mdi:thermostat",
     ),
