@@ -17,7 +17,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN, MAX_TEMP, MIN_TEMP, TEMP_STEP
 from .coordinator import ACITThermACECCoordinator
-from .models import ACITFeature, get_supported_features
+from .models import ACITFeature, get_model_name, get_supported_features
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -72,7 +72,7 @@ class ACITThermACECClimate(CoordinatorEntity, ClimateEntity):
             "identifiers": {(DOMAIN, mac_address)},
             "name": entry.data.get("device_name", "ACIT ThermACEC"),
             "manufacturer": device_info.get("manufacturer", "ACIT"),
-            "model": device_info.get("model", "ThermACEC"),
+            "model": get_model_name(device_info.get("model")),
             "sw_version": device_info.get("version", "Unavailable"),
         }
 

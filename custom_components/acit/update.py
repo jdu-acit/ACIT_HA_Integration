@@ -16,6 +16,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
 from .coordinator import ACITThermACECCoordinator
+from .models import get_model_name
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -59,7 +60,7 @@ class ACITUpdateEntity(CoordinatorEntity, UpdateEntity):
             "identifiers": {(DOMAIN, mac_address)},
             "name": entry.data.get("device_name", "ACIT ThermACEC"),
             "manufacturer": device_info.get("manufacturer", "ACIT"),
-            "model": device_info.get("model", "ThermACEC"),
+            "model": get_model_name(device_info.get("model")),
             "sw_version": device_info.get("version", "Unavailable"),
         }
 

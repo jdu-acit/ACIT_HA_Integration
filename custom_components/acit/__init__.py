@@ -11,6 +11,7 @@ from homeassistant.helpers import device_registry as dr
 
 from .const import DOMAIN
 from .coordinator import ACITThermACECCoordinator
+from .models import get_model_name
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -39,7 +40,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         identifiers={(DOMAIN, device_info.get("mac_address", entry.entry_id))},
         manufacturer=device_info.get("manufacturer", "ACIT"),
         name=entry.data.get("device_name", "ACIT ThermACEC"),
-        model=device_info.get("model", "ThermACEC"),
+        model=get_model_name(device_info.get("model")),
         sw_version=device_info.get("version", "Unavailable"),
     )
 

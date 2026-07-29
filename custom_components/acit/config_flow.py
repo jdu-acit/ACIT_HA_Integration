@@ -23,6 +23,7 @@ from .const import (
     RPC_METHOD_REQUEST_TOKEN,
     RPC_TIMEOUT,
 )
+from .models import MODEL_CONFIGS, resolve_model
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -76,7 +77,9 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any], token: str |
 
                 config = result.get("result", {})
                 mac_address = config.get("mac_address", "")
-                model = config.get("model", "ThermACEC")
+                # No default here: an unnamed device must resolve to the minimal
+                # profile, not silently inherit the storage-radiator one.
+                model = config.get("model", "")
 
                 return {
                     "title": data[CONF_NAME],
@@ -136,6 +139,8 @@ class ACITThermaControlConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._host: str = ""
         self._port: int = DEFAULT_PORT
         self._name: str = DEFAULT_NAME
+        # Product identifier announced by the device; empty until discovery.
+        self._model: str = ""
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -255,6 +260,11 @@ class ACITThermaControlConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         # Extract device name from hostname
         device_name = hostname.replace(".local.", "").replace("_", " ").title()
 
+        # The mDNS TXT record carries the product identifier (model=NOS_ThermACEC,
+        # ACCU_ThermACEC, ...). Use it rather than assuming a product.
+        properties = discovery_info.properties or {}
+        self._model = properties.get("model") or ""
+
         self._host = host
         self._port = port
         self._name = device_name
@@ -279,7 +289,7 @@ class ACITThermaControlConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             description_placeholders={
                 "name": self._name,
                 "host": self._host,
-                "model": "ThermACEC",
+                "model": MODEL_CONFIGS[resolve_model(self._model)].name,
             },
         )
 

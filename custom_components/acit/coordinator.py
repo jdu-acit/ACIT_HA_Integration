@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 from datetime import timedelta
 from typing import Any
 
@@ -27,6 +28,32 @@ from .const import (
 )
 
 _LOGGER = logging.getLogger(__name__)
+
+# GitHub asset URL announced by the device, e.g.
+# https://github.com/<owner>/<repo>/releases/download/<tag>/<file>.bin
+_GITHUB_ASSET_URL = re.compile(
+    r"^(?P<repo>https://github\.com/[^/]+/[^/]+)/releases/download/(?P<tag>[^/]+)/"
+)
+
+
+def _release_page_url(asset_url: str | None) -> str | None:
+    """Derive the release page from the binary URL the device reports.
+
+    The device is the authority on where its firmware comes from -- it is the
+    one that downloads it. Building the URL from the model name here produced
+    links to repositories that never existed.
+
+    Returns None when the URL has an unexpected shape: no link is better than a
+    dead one.
+    """
+    if not asset_url:
+        return None
+
+    if (match := _GITHUB_ASSET_URL.match(asset_url)) is None:
+        _LOGGER.debug("OTA URL '%s' is not a GitHub asset, no release link", asset_url)
+        return None
+
+    return f"{match['repo']}/releases/tag/{match['tag']}"
 
 
 class ACITThermACECCoordinator(DataUpdateCoordinator):
@@ -168,7 +195,9 @@ class ACITThermACECCoordinator(DataUpdateCoordinator):
                 _LOGGER.warning(f"⚠️ No firmware version in response! Full response: {config}")
 
             self._device_info = {
-                "model": config.get("model", "ThermACEC"),
+                # No default: an unnamed device resolves to the minimal profile
+                # rather than silently inheriting the storage-radiator one.
+                "model": config.get("model", ""),
                 "version": config.get("version", "Unavailable"),
                 "manufacturer": config.get("manufacturer", "ACIT"),
                 "mac_address": config.get("mac_address", ""),
@@ -181,7 +210,7 @@ class ACITThermACECCoordinator(DataUpdateCoordinator):
             _LOGGER.error(f"Error retrieving device configuration: {err}")
             # Use default values
             self._device_info = {
-                "model": "ThermACEC",
+                "model": "",
                 "version": "Unavailable",
                 "manufacturer": "ACIT",
                 "mac_address": "",
@@ -318,20 +347,17 @@ class ACITThermACECCoordinator(DataUpdateCoordinator):
         try:
             result = await self._async_rpc_call("System.CheckUpdate")
 
-            # Update OTA data
-            self.data["ota"]["update_available"] = result.get("update_available", False)
-            self.data["ota"]["available_version"] = result.get("version")
-            self.data["ota"]["channel"] = result.get("channel", "stable")
+            # Field names as returned by System.CheckUpdate:
+            #   ok, available, current_version, latest_version, channel, url,
+            #   size, sha256
+            self.data["ota"]["update_available"] = result.get("available", False)
+            self.data["ota"]["available_version"] = result.get("latest_version")
+            self.data["ota"]["channel"] = result.get("channel") or "stable"
             self.data["ota"]["size"] = result.get("size")
             self.data["ota"]["mandatory"] = result.get("mandatory", False)
 
-            # Build release URL (GitHub)
-            if self.data["ota"]["update_available"]:
-                version = self.data["ota"]["available_version"]
-                model = self._device_info.get("model", "ThermACEC").lower()
-                self.data["ota"]["release_url"] = (
-                    f"https://github.com/jdu-acit/ACIT_ACCU_{model.upper()}_OTA/releases/tag/v{version}"
-                )
+            # Release page, derived from the URL the device itself reports.
+            self.data["ota"]["release_url"] = _release_page_url(result.get("url"))
 
             _LOGGER.debug(f"OTA check: {self.data['ota']}")
 
