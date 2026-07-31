@@ -100,11 +100,18 @@ class ACITUpdateEntity(CoordinatorEntity, UpdateEntity):
             return f"New version available on the {channel} channel"
         return None
 
-    @property
-    def release_url(self) -> str | None:
-        """URL to the full release notes."""
-        ota_data = self.coordinator.data.get("ota", {})
-        return ota_data.get("release_url")
+    # No release_url property, deliberately.
+    #
+    # The OTA server only serves files: it returns 404 on a directory, so there
+    # is no page to link to. The previous implementation derived a GitHub release
+    # page from the binary URL, which stopped meaning anything when the fleet
+    # moved to the ACIT server -- and became a broken link the day the release
+    # repository went private (ACIT_SmartEnergy#28).
+    #
+    # What the user needs before installing -- which version, from which channel,
+    # how large, which fingerprint -- is in async_release_notes() below. The day
+    # System.CheckUpdate reports a notes URL of its own, showing it is three
+    # lines; inventing one is what this removes.
 
     @property
     def in_progress(self) -> bool | None:
@@ -140,11 +147,15 @@ class ACITUpdateEntity(CoordinatorEntity, UpdateEntity):
             raise
 
     async def async_release_notes(self) -> str | None:
-        """Return the full release notes."""
+        """Return what is known about the pending update.
+
+        These are not release notes in the usual sense -- nobody writes any --
+        but they answer the question the dialog actually raises: what am I about
+        to install? Every value here is reported by the device itself.
+        """
         ota_data = self.coordinator.data.get("ota", {})
 
-        notes = []
-        notes.append(f"## Version {self.latest_version}\n")
+        notes = [f"## Version {self.latest_version}\n"]
 
         if channel := ota_data.get("channel"):
             notes.append(f"**Channel:** {channel}\n")
@@ -153,9 +164,11 @@ class ACITUpdateEntity(CoordinatorEntity, UpdateEntity):
             size_mb = size / (1024 * 1024)
             notes.append(f"**Size:** {size_mb:.2f} MB\n")
 
-        if mandatory := ota_data.get("mandatory"):
-            if mandatory:
-                notes.append("⚠️ **Mandatory update**\n")
+        # Short fingerprint: enough to tell two builds apart, and to match what
+        # the OTA server publishes. The device verifies the full hash against the
+        # manifest before switching partitions.
+        if sha256 := ota_data.get("sha256"):
+            notes.append(f"**Fingerprint:** `{sha256[:12]}`\n")
 
         notes.append("\n---\n")
         notes.append("The update will be downloaded and installed automatically.")

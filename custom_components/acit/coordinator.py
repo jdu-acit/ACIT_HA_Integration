@@ -4,7 +4,6 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import re
 from datetime import timedelta
 from typing import Any
 
@@ -28,32 +27,6 @@ from .const import (
 )
 
 _LOGGER = logging.getLogger(__name__)
-
-# GitHub asset URL announced by the device, e.g.
-# https://github.com/<owner>/<repo>/releases/download/<tag>/<file>.bin
-_GITHUB_ASSET_URL = re.compile(
-    r"^(?P<repo>https://github\.com/[^/]+/[^/]+)/releases/download/(?P<tag>[^/]+)/"
-)
-
-
-def _release_page_url(asset_url: str | None) -> str | None:
-    """Derive the release page from the binary URL the device reports.
-
-    The device is the authority on where its firmware comes from -- it is the
-    one that downloads it. Building the URL from the model name here produced
-    links to repositories that never existed.
-
-    Returns None when the URL has an unexpected shape: no link is better than a
-    dead one.
-    """
-    if not asset_url:
-        return None
-
-    if (match := _GITHUB_ASSET_URL.match(asset_url)) is None:
-        _LOGGER.debug("OTA URL '%s' is not a GitHub asset, no release link", asset_url)
-        return None
-
-    return f"{match['repo']}/releases/tag/{match['tag']}"
 
 
 class ACITThermACECCoordinator(DataUpdateCoordinator):
@@ -103,8 +76,7 @@ class ACITThermACECCoordinator(DataUpdateCoordinator):
                 "progress": None,
                 "channel": "stable",
                 "size": None,
-                "mandatory": False,
-                "release_url": None,
+                "sha256": None,
             },
         }
 
@@ -347,17 +319,16 @@ class ACITThermACECCoordinator(DataUpdateCoordinator):
         try:
             result = await self._async_rpc_call("System.CheckUpdate")
 
-            # Field names as returned by System.CheckUpdate:
-            #   ok, available, current_version, latest_version, channel, url,
-            #   size, sha256
+            # Every field the firmware actually sends, and nothing more:
+            # ok, available, current_version, latest_version, channel, url,
+            # size, sha256 (rpc_handler.c, rpc_system_check_update). "url" is
+            # the binary itself -- the device is the one that downloads it, so
+            # it stays out of the entity: there is no page to point a user to.
             self.data["ota"]["update_available"] = result.get("available", False)
             self.data["ota"]["available_version"] = result.get("latest_version")
             self.data["ota"]["channel"] = result.get("channel") or "stable"
             self.data["ota"]["size"] = result.get("size")
-            self.data["ota"]["mandatory"] = result.get("mandatory", False)
-
-            # Release page, derived from the URL the device itself reports.
-            self.data["ota"]["release_url"] = _release_page_url(result.get("url"))
+            self.data["ota"]["sha256"] = result.get("sha256")
 
             _LOGGER.debug(f"OTA check: {self.data['ota']}")
 
