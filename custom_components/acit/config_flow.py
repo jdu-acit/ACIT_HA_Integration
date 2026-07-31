@@ -23,7 +23,7 @@ from .const import (
     RPC_METHOD_REQUEST_TOKEN,
     RPC_TIMEOUT,
 )
-from .models import MODEL_CONFIGS, resolve_model
+from .models import get_model_name
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -289,7 +289,7 @@ class ACITThermaControlConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             description_placeholders={
                 "name": self._name,
                 "host": self._host,
-                "model": MODEL_CONFIGS[resolve_model(self._model)].name,
+                "model": get_model_name(self._model),
             },
         )
 

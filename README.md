@@ -7,8 +7,21 @@
 Home Assistant custom integration for ACIT electronic boards - Smart temperature and setpoint management.
 
 **Supported Models:**
-- 🌡️ **ACIT ThermACEC** - Thermostat with ambient temperature control
-- 🔋 **ACIT AccuBloc** *(coming soon)* - Battery management system
+
+The integration identifies a device from the model it announces itself (mDNS TXT
+record `model=`, `Thermostat.GetConfig`), and only exposes the entities that
+model actually has.
+
+| Announced `model` | Product | Entities |
+| --- | --- | --- |
+| `ACCU_ThermACEC` | 🌡️ **ACCU-ThermACEC** — heat-storage radiator | temperature, setpoint, heating, fan, core charge |
+| `NOS_ThermACEC` | 🌡️ **NOS-ThermACEC** — two-stage convector | temperature, setpoint, heating |
+| `A2_ThermACEC` | 🌡️ **A2-ThermACEC** — KC868-A2 controller (2 relays, RS485, 4G) | temperature, setpoint, heating |
+| `AccuBloc_ThermACEC` | 🔋 **AccuBloc-ThermACEC** *(coming soon)* — industrial heat storage | temperature, setpoint, heating, cooling, fan |
+| `EMS_ThermACEC` | ⚡ **EMS-ThermACEC** *(coming soon)* — energy manager | power, energy import/export, relays |
+
+An unrecognized model gets a minimal profile (temperature and setpoint only) and
+a warning in the log, rather than the entities of another product.
 
 ## 🌟 Features
 
@@ -24,7 +37,7 @@ Home Assistant custom integration for ACIT electronic boards - Smart temperature
 ## 📋 Prerequisites
 
 - Home Assistant 2024.1.0 or higher
-- ACIT electronic board (ThermACEC, AccuBloc, etc.) with firmware v2.0+
+- ACIT electronic board (ACCU, NOS, A2, etc.) with firmware v2.0+
 - Local network connectivity (device and Home Assistant on same network)
 
 ## 📦 Installation

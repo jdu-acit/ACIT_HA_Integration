@@ -20,6 +20,7 @@ class ACITModel(StrEnum):
 
     ACCU = "ACCU_ThermACEC"
     NOS = "NOS_ThermACEC"
+    A2 = "A2_ThermACEC"
     EMS = "EMS_ThermACEC"
     ACCUBLOC = "AccuBloc_ThermACEC"
     PREHEATER = "PreHeater_ThermACEC"
@@ -92,6 +93,26 @@ MODEL_CONFIGS: dict[str, ACITModelConfig] = {
     ACITModel.NOS: ACITModelConfig(
         model=ACITModel.NOS,
         name="NOS-ThermACEC",
+        supports_climate=True,
+        supports_energy=False,
+        default_features=[
+            ACITFeature.TEMPERATURE,
+            ACITFeature.TARGET_TEMPERATURE,
+            ACITFeature.HEATING,
+        ],
+        icon="mdi:heat-wave",
+        unsupported_features=[
+            ACITFeature.FAN,
+            ACITFeature.CORE_CHARGE,
+            ACITFeature.COOLING,
+        ],
+    ),
+    # Kincony KC868-A2 board: two relays, two digital inputs, RS485 and 1-Wire
+    # (main/include/gpio_pins.h). No fan output, no core probe -- the firmware
+    # descends from the ACCU one, the hardware does not.
+    ACITModel.A2: ACITModelConfig(
+        model=ACITModel.A2,
+        name="A2-ThermACEC",
         supports_climate=True,
         supports_energy=False,
         default_features=[
@@ -197,14 +218,37 @@ def resolve_model(model_name: str | None) -> ACITModel:
     return ACITModel.UNKNOWN
 
 
-def get_model_config(model_name: str) -> ACITModelConfig:
-    """Get the configuration for a model."""
-    return MODEL_CONFIGS[resolve_model(model_name)]
+def get_model_config(model_name: str | None) -> ACITModelConfig:
+    """Get the configuration for a model.
+
+    A model may be known to :class:`ACITModel` -- so the device is named
+    correctly -- before its profile is written, as long as the product exists
+    only on paper. Those fall back to the minimal profile instead of raising.
+    """
+    model = resolve_model(model_name)
+
+    if (config := MODEL_CONFIGS.get(model)) is not None:
+        return config
+
+    _LOGGER.warning(
+        "Model %s has no feature profile yet, using a minimal one", model.value
+    )
+    return MODEL_CONFIGS[ACITModel.UNKNOWN]
 
 
 def get_model_name(model_name: str | None) -> str:
-    """Human-readable product name, for the device registry and forms."""
-    return MODEL_CONFIGS[resolve_model(model_name)].name
+    """Human-readable product name, for the device registry and forms.
+
+    A recognized model without a profile still gets its own name: the firmware
+    derives ``PRODUCT_LABEL`` from the machine identifier the same way, and
+    showing "ThermACEC" for a device we did identify would be a regression.
+    """
+    model = resolve_model(model_name)
+
+    if (config := MODEL_CONFIGS.get(model)) is not None:
+        return config.name
+
+    return model.value.replace("_", "-")
 
 
 def get_supported_features(device_info: dict[str, Any]) -> list[ACITFeature]:

@@ -7,7 +7,7 @@ Home Assistant custom integration for ACIT electronic boards - Smart temperature
 - **🌡️ Temperature Sensor** - Real-time ambient temperature reading
 - **🎯 Setpoint Control** - Complete climate entity with temperature control
 - **🚀 HTTP RPC API** - JSON-RPC 2.0 protocol for commands
-- **� WebSocket Notifications** - Real-time push updates
+- **📡 WebSocket Notifications** - Real-time push updates
 - **🔍 mDNS Auto-Discovery** - Automatic device detection
 - **🔄 OTA Update Support** - Firmware update management
 - **🌍 Multi-language Interface** - Complete FR/EN translations
@@ -24,7 +24,7 @@ Home Assistant custom integration for ACIT electronic boards - Smart temperature
 ## 🔧 Requirements
 
 - Home Assistant 2024.1.0+
-- ACIT device with firmware v2.0+ (ThermACEC, AccuBloc, etc.)
+- ACIT device with firmware v2.0+ (ACCU, NOS, A2, etc.)
 - Local network connectivity
 
 ## 📚 Documentation
