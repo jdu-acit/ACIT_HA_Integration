@@ -18,6 +18,7 @@ from .const import (
     RPC_ENDPOINT,
     RPC_METHOD_GET_CONFIG,
     RPC_METHOD_GET_STATUS,
+    RPC_METHOD_SET_MODE,
     RPC_METHOD_SET_TARGET_TEMP,
     RPC_TIMEOUT,
     UPDATE_INTERVAL,
@@ -176,6 +177,11 @@ class ACITThermACECCoordinator(DataUpdateCoordinator):
                 "min_temp": config.get("min_temp", 5),
                 "max_temp": config.get("max_temp", 35),
                 "features": config.get("features", []),
+                # What the device declares it can do -- never what the range can do.
+                # An older firmware simply omits this, and then no mode is exposed
+                # rather than modes it would reject (ACIT_SmartEnergy#78, rule 2).
+                "operating_modes": config.get("operating_modes", []),
+                "override_minutes": config.get("override_minutes", {}),
             }
             _LOGGER.info(f"Device configuration: {self._device_info}")
         except UpdateFailed as err:
@@ -261,6 +267,7 @@ class ACITThermACECCoordinator(DataUpdateCoordinator):
                 self.data["heater_level"] = params.get("heater_level")
                 self.data["fan_speed"] = params.get("fan_speed")
                 self.data["core_charge_pct"] = params.get("core_charge_pct")
+                self._store_mode(params)
                 self.data["available"] = True
 
                 # Notify entities
@@ -286,6 +293,7 @@ class ACITThermACECCoordinator(DataUpdateCoordinator):
             self.data["heater_level"] = status.get("heater_level")
             self.data["fan_speed"] = status.get("fan_speed")
             self.data["core_charge_pct"] = status.get("core_charge_pct")
+            self._store_mode(status)
             self.data["available"] = True
 
             # Check OTA status
@@ -308,6 +316,40 @@ class ACITThermACECCoordinator(DataUpdateCoordinator):
             _LOGGER.info(f"Target temperature set to {temperature}°C")
         except UpdateFailed as err:
             _LOGGER.error(f"Error changing target temperature: {err}")
+            raise
+
+    def _store_mode(self, payload: dict[str, Any]) -> None:
+        """Copy the operating-mode fields out of a status payload.
+
+        Both the RPC reply and the WebSocket notification carry the same shape, so
+        the copy lives in one place: they used to drift apart field by field.
+
+        A device without a thermal mode axis (the EMS) sends NO mode field at all
+        rather than an empty one -- "absent" and "off" are different things. Hence
+        `None` here, which the climate entity reads as "do not expose modes".
+        """
+        self.data["operating"] = payload.get("operating")
+        self.data["operating_origin"] = payload.get("operating_origin")
+        self.data["auto"] = payload.get("auto")
+        self.data["target"] = payload.get("target")
+        self.data["override"] = payload.get("override") or {}
+
+    async def async_set_operating_mode(self, mode: str) -> None:
+        """Set the operating mode via RPC, by machine name.
+
+        A business refusal comes back inside the result -- the parameters were
+        valid, the device declined -- so a successful call still has to be checked
+        for `success`. Firmware convention, shared with the MQTT acknowledgement.
+        """
+        try:
+            result = await self._async_rpc_call(RPC_METHOD_SET_MODE, {"mode": mode})
+            if result.get("success") is False:
+                reason = result.get("reason", "unknown")
+                _LOGGER.error(f"Operating mode {mode} refused by the device: {reason}")
+                raise UpdateFailed(f"Operating mode refused: {reason}")
+            _LOGGER.info(f"Operating mode set to {mode}")
+        except UpdateFailed as err:
+            _LOGGER.error(f"Error setting operating mode: {err}")
             raise
 
     async def call_rpc(self, method: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
